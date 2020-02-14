@@ -1,0 +1,35 @@
+def get_prediction(df):
+    prediction = {}
+    df1= df.rename(columns={'Date': 'ds','qty_ordered': 'y', 'Final Item No': 'item', 'cap': 'cap'})
+    list_items = df1.item.unique()
+
+    for item in list_items:
+        item_df = df1.loc[df1['item'] == item]
+        # set the uncertainty interval to 95% (the Prophet default is 80%)
+        my_model = Prophet(growth='logistic',
+        daily_seasonality=False,
+        weekly_seasonality=False,
+        yearly_seasonality=False
+        ).add_seasonality(
+            name='weekly_in_season',
+            period=7,
+            fourier_order=3,
+            condition_name='in_season'
+        ).add_seasonality(
+            name='weekly_off_season',
+            period=7,
+            fourier_order=3,
+            condition_name='off_season'
+        ).add_seasonality(
+            name='yearly',
+            period=7,
+            fourier_order=20)
+        my_model.fit(item_df)
+        future_dates = my_model.make_future_dataframe(periods=12, freq='M')
+        future_dates["in_season"] = future_dates['ds'].apply(is_season)
+        future_dates["off_season"] = ~future_dates['ds'].apply(is_season)
+        future_dates['cap']= item_df['cap'].iloc[0]
+        forecast = my_model.predict(future_dates)
+        prediction[item] = forecast
+        
+    return prediction
